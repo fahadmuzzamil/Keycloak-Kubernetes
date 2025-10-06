@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: identity
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: keycloak }
+  template:
+    metadata:
+      labels: { app: keycloak }
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak
+        imagePullPolicy: IfNotPresent
+        command: 
+          - "/opt/keycloak/bin/kc.sh"
+          - "start"
+        env:
+          - name: KC_FEATURES
+            value: "scripts,token-exchange,admin-fine-grained-authz:v1"
+          - name: KEYCLOAK_EXTRA_ARGS
+            value: "-Dkeycloak.profile.feature.scripts=enabled -Dkeycloak.profile.feature.upload_scripts=enabled"
+          - name: PROXY_ADDRESS_FORWARDING
+            value: "true"
+          
+          # CLUSTERING CONFIGURATION - Using Kubernetes DNS discovery
+          - name: KC_CACHE
+            value: "ispn"
+          - name: KC_CACHE_STACK
+            value: "kubernetes"
+          - name: JAVA_OPTS_APPEND
+            value: "-Djgroups.dns.query=keycloak-headless.keycloak.svc.cluster.local"
+          - name: KEYCLOAK_ADMIN
+            value: "admin"
+          - name: KEYCLOAK_ADMIN_PASSWORD
+            value: "SomeDifficultPassword"   ## Recommended to use kubernetes secret and try to set difficult password 
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: management
+          containerPort: 9000
+          
+        volumeMounts:
+        - name: keycloak-conf
+          mountPath: /opt/keycloak/conf/keycloak.conf
+          subPath: keycloak.conf
+        - name: providers         ## you can remove this volumeMount if you dont want to use custom providers/JArs......
+          mountPath: /opt/bitnami/keycloak/providers
+          readOnly: true
+        - name: themes             ## you can remove this volumeMount if you dont want to use custom themes......
+          mountPath: /opt/bitnami/keycloak/themes
+          readOnly: true
+
+          startupProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            failureThreshold: 60
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: 9000 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+      resources:
+        requests:
+          cpu: "300m"
+          memory: "512Mi"
+        limits:
+          cpu: "700m"
+          memory: "1Gi"
+      
+      volumes:
+        - name: keycloak-conf
+          configMap:
+            name: keycloak-conf
+        - name: providers          ## you can remove this volume if you dont want to use custom providers/JArs......
+          persistentVolumeClaim:
+            claimName: keycloak-providers
+        - name: themes             ## you can remove this volume if you dont want to use custom themes......
+          persistentVolumeClaim:
+            claimName: keycloak-themes   
