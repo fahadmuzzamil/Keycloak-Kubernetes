@@ -29,14 +29,13 @@ spec:
           # CLUSTERING CONFIGURATION - Using Kubernetes DNS discovery
           - name: KC_CACHE
             value: "ispn"
-          - name: KC_CACHE_STACK
-            value: "kubernetes"
           - name: JAVA_OPTS_APPEND
-            value: "-Djgroups.dns.query=keycloak-headless.keycloak.svc.cluster.local"
+            value: "-XX:MaxRAMPercentage=90 -XX:MinRAMPercentage=60"
           - name: KEYCLOAK_ADMIN
             value: "admin"
           - name: KEYCLOAK_ADMIN_PASSWORD
-            value: "SomeDifficultPassword"   ## Recommended to use kubernetes secret and try to set difficult password 
+            value: "keycloak@datalake"
+            
         ports:
         - name: http
           containerPort: 8080
